@@ -1,2 +1,2 @@
-- [ ] Check AI from OpenRouter
+- [x] Check AI from OpenRouter
 - [ ] Get Pull Request from Github
