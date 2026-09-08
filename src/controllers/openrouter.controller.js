@@ -1,6 +1,6 @@
 import openrouter from '../services/openrouter.service.js';
 
-export const postResponse = async (req, res) => {
+export const openrouterResponse = async (req, res) => {
     try {
         const result = await openrouter(req.body.userInput);
         res.json(result);
