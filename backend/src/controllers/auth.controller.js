@@ -5,12 +5,12 @@ const axios = require("axios");
 const {
     generateAccessToken,
     generateRefreshToken
-} = require("../utils/token");
+} = require("/utils/token");
 
 const {
     saveRefreshToken,
     getRefreshToken
-} = require("../utils/refreshToken.store");
+} = require("../utils/refreshToken.store")
 
 // Login và tạo 2 token
 const login = (req, res) => {
