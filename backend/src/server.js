@@ -1,5 +1,5 @@
 import express from 'express';
-import routes from './src/routes/index.js';
+import routes from './routes/index.js';
 import rateLimit from 'express-rate-limit';
 
 const app = express();
@@ -18,6 +18,7 @@ const PORT = process.env.PORT || 3000
 app.use(express.json());
 app.use(globalLimiter);
 app.use('/api', routes);
+app.use("/api/auth", authRoutes);
 
 app.get('/', (req, res) => {
   res.send('Hello, World!');
