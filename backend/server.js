@@ -1,5 +1,5 @@
 import express from 'express';
-import routes from './routes/index.js';
+import routes from './src/routes/index.js';
 import rateLimit from 'express-rate-limit';
 
 const app = express();
