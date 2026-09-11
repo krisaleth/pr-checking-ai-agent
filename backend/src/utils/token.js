@@ -1,7 +1,7 @@
-const jwt = require("jsonwebtoken");
+import jwt from "jsonwebtoken";
 
 // Tạo Access Token - dùng để gọi API
-const generateAccessToken = (user) => {
+export const generateAccessToken = (user) => {
     return jwt.sign(
         {
             userId: user.userId
@@ -14,7 +14,7 @@ const generateAccessToken = (user) => {
 };
 
 // Tạo Refresh Token - dùng để lấy Access Token mới
-const generateRefreshToken = (user) => {
+export const generateRefreshToken = (user) => {
     return jwt.sign(
         {
             userId: user.userId
@@ -24,9 +24,4 @@ const generateRefreshToken = (user) => {
             expiresIn: "7d"
         }
     );
-};
-
-module.exports = {
-    generateAccessToken,
-    generateRefreshToken
 };

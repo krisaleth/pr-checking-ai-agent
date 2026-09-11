@@ -1,23 +1,12 @@
-const express = require("express");
+import { Router } from 'express';
+import { login, getProfile, refreshAccessToken, githubCallback } from '../controllers/auth.controller.js';
+import verifyAccessToken from '../middleware/auth.middleware.js';
 
-const router = express.Router();
+const authRouter = Router();
 
-const {
-    login,
-    getProfile,
-    refreshAccessToken,
-    githubCallback
-} = require("../controllers/auth.controller");
+authRouter.post("/login", login);
 
-const verifyAccessToken = require("../middleware/auth.middleware");
-
-// ==================== LOGIN ====================
-
-// Login thường
-router.post("/login", login);
-
-// GitHub Login
-router.get("/github", (req, res) => {
+authRouter.get("/github", (req, res) => {
     const githubUrl =
         `https://github.com/login/oauth/authorize` +
         `?client_id=${process.env.GITHUB_CLIENT_ID}` +
@@ -27,20 +16,8 @@ router.get("/github", (req, res) => {
     res.redirect(githubUrl);
 });
 
-// GitHub OAuth Callback
-router.get("/github/callback", githubCallback);
+authRouter.get("/github/callback", githubCallback);
+authRouter.post("/refresh-token", refreshAccessToken);
+authRouter.get("/profile", verifyAccessToken, getProfile);
 
-
-// ==================== TOKEN ====================
-
-// Lấy Access Token mới
-router.post("/refresh-token", refreshAccessToken);
-
-
-// ==================== PROTECTED API ====================
-
-// API cần Access Token
-router.get("/profile", verifyAccessToken, getProfile);
-
-
-module.exports = router;
+export default authRouter;

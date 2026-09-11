@@ -1,19 +1,18 @@
-const jwt = require("jsonwebtoken");
+import jwt from "jsonwebtoken";
+import axios from "axios";
 
-const axios = require("axios");
-
-const {
+import {
     generateAccessToken,
     generateRefreshToken
-} = require("/utils/token");
+} from "../utils/token.js";
 
-const {
+import {
     saveRefreshToken,
     getRefreshToken
-} = require("../utils/refreshToken.store")
+} from "../utils/refreshToken.store.js";
 
 // Login và tạo 2 token
-const login = (req, res) => {
+export function login(req, res) {
     // Tạm thời giả lập user
     const user = {
         userId: "U001"
@@ -34,7 +33,7 @@ const login = (req, res) => {
 };
 
 // API test cần đăng nhập
-const getProfile = (req, res) => {
+export function getProfile(req, res) {
     res.status(200).json({
         success: true,
         message: "Access Token is valid",
@@ -43,7 +42,7 @@ const getProfile = (req, res) => {
 };
 
 // Tạo Access Token mới bằng Refresh Token
-const refreshAccessToken = (req, res) => {
+export function refreshAccessToken(req, res) {
     try {
         const { refreshToken } = req.body;
 
@@ -90,7 +89,7 @@ const refreshAccessToken = (req, res) => {
 };
 
 // GitHub OAuth callback
-const githubCallback = async (req, res) => {
+export async function githubCallback(req, res) {
     try {
         const { code } = req.query;
 
@@ -101,7 +100,6 @@ const githubCallback = async (req, res) => {
             });
         }
 
-        // Đổi code lấy GitHub Access Token
         const tokenResponse = await axios.post(
             "https://github.com/login/oauth/access_token",
             {
@@ -164,11 +162,4 @@ const githubCallback = async (req, res) => {
             message: "GitHub login failed"
         });
     }
-};
-
-module.exports = {
-    login,
-    getProfile,
-    refreshAccessToken,
-    githubCallback
 };

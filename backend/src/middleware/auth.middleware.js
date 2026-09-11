@@ -1,7 +1,7 @@
-const jwt = require("jsonwebtoken");
+import jwt from "jsonwebtoken";
 
 // Kiểm tra Access Token
-const verifyAccessToken = (req, res, next) => {
+export default function verifyAccessToken(req, res, next) {
     try {
         // Lấy token từ header Authorization
         const authHeader = req.headers.authorization;
@@ -33,5 +33,3 @@ const verifyAccessToken = (req, res, next) => {
         });
     }
 };
-
-module.exports = verifyAccessToken;
