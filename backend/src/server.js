@@ -2,6 +2,9 @@ import express from 'express';
 import routes from './routes/index.js';
 import rateLimit from 'express-rate-limit';
 import authRouter from './routes/auth.routes.js';
+import dotenv from "dotenv";
+dotenv.config();
+import connectDB from "./config/database.js";
 
 const app = express();
 const globalLimiter = rateLimit({
@@ -25,6 +28,7 @@ app.get('/', (req, res) => {
   res.send('Hello, World!');
 });
 
+await connectDB();
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
