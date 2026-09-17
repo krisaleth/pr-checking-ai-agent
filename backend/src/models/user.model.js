@@ -2,37 +2,27 @@ import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
     {
-        userId: {
-            type: String,
+        githubId: {
+            type: Number,
             required: true,
-            unique: true
+            unique: true,
         },
-
-        username: {
+        login: {
             type: String,
-            required: true
+            maxlength: 39,
         },
-
+        name: {
+            type: String,
+            maxlength: 255
+        },
         email: {
             type: String,
-            default: null
         },
-
-        avatar: {
+        avatarUrl: {
             type: String,
-            default: null
         },
-
-        provider: {
-            type: String,
-            required: true,
-            default: "github"
-        },
-
-        githubId: {
-            type: String,
-            required: true,
-            unique: true
+        lastLoginAt: {
+            type: Date,
         }
     },
     {
@@ -40,6 +30,6 @@ const userSchema = new mongoose.Schema(
     }
 );
 
-const User = mongoose.model("User", userSchema);
+userSchema.index({ githubId: 1 }, { unique: true});
 
-export default User;
+export default mongoose.model('User', userSchema);
