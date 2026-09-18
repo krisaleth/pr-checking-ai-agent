@@ -5,6 +5,7 @@ import routes from './routes/index.routes.js';
 import authRouter from './routes/auth.routes.js';
 import connectDB from './config/database.js';
 import session from 'express-session';
+import cookieParser from 'cookie-parser';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -26,11 +27,9 @@ app.use(session({
 }));
 app.use(globalLimiter);
 
-// Auth trước, routes sau
+app.use(cookieParser());
 app.use('/api/auth', authRouter);
 app.use('/api', routes);
-
-app.get('/', (req, res) => res.send('Hello, World!'));
 
 // 404
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));

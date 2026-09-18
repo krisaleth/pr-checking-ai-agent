@@ -6,7 +6,6 @@ const router = Router();
 
 router.get('/github', authController.redirectToGithub);
 router.get('/github/callback', authController.githubCallback);
-router.post('/refresh', authController.refresh);
 router.post('/logout', authController.logout);
 
 router.post('/logout-all', requireAuth, authController.logoutAll);

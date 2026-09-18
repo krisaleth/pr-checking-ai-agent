@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import axios from 'axios';
 import { User, OAuthToken, RefreshToken } from '../models/index.models.js';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utils/token.js';
-import { encrypt } from '../utils/encrypt.js';
+import { decrypt, encrypt } from '../utils/encrypt.js';
 
 const GITHUB_CLIENT_ID     = process.env.GITHUB_CLIENT_ID;
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
@@ -29,10 +29,12 @@ export const authController = {
   async githubCallback(req, res) {
     try {
       const { code, state } = req.query;
+
       if (state !== req.session.oauthState) {
         return res.status(403).json({ error: 'Invalid state' });
       }
       delete req.session.oauthState;
+
       const tokenRes = await axios.post(
         'https://github.com/login/oauth/access_token',
         {
@@ -42,11 +44,14 @@ export const authController = {
         },
         { headers: { Accept: 'application/json' } }
       );
+
       const { access_token: githubToken, scope } = tokenRes.data;
+
       const userRes = await axios.get('https://api.github.com/user', {
         headers: { Authorization: `Bearer ${githubToken}` },
       });
       const profile = userRes.data;
+
       let user = await User.findOne({ githubId: profile.id });
       if (!user) {
         user = await User.create({
@@ -60,72 +65,78 @@ export const authController = {
         user.lastLoginAt = new Date();
         await user.save();
       }
+
       await OAuthToken.updateOne(
         { userId: user._id, provider: 'github' },
         {
           accessToken: encrypt(githubToken),
-          scopes:      (scope || '').split(' ').filter(Boolean),
+          scopes: (scope || '').split(' ').filter(Boolean),
         },
         { upsert: true }
       );
+
       const accessToken  = generateAccessToken(user._id);
-      const refreshToken = generateRefreshToken(user._id);
-      await RefreshToken.create({
-        userId:    user._id,
-        token:     hashToken(refreshToken),
-        expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL),
+      let refreshToken;
+      const existing = await RefreshToken.findOne({
+        userId: user._id,
+        expiresAt: { $gt: new Date() }
       });
-      res.json({ accessToken, refreshToken });
+      if (existing) {
+        refreshToken = decrypt(existing.rawToken);
+      } else {
+        await RefreshToken.deleteMany({ userId: user._id });
+        refreshToken = generateRefreshToken(user._id);
+        await RefreshToken.create({
+          userId: user._id,
+          token: hashToken(refreshToken),
+          rawToken: encrypt(refreshToken),
+          expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL),
+        });
+      }
+      
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: REFRESH_TOKEN_TTL,
+        path: '/'
+      });
+
+      res.json({ accessToken });
     } catch (err) {
       console.error('GitHub callback error:', err);
       res.status(500).json({ error: 'Login failed' });
     }
   },
-  async refresh(req, res) {
-    try {
-      const { refreshToken } = req.body;
-      if (!refreshToken) {
-        return res.status(400).json({ error: 'Missing refresh token' });
-      }
-      let payload;
-      try {
-        payload = verifyRefreshToken(refreshToken);
-      } catch {
-        return res.status(401).json({ error: 'Invalid or expired refresh token' });
-      }
-      const stored = await RefreshToken.findOne({
-        token:  hashToken(refreshToken),
-        userId: payload.sub,
-      });
 
-      if (!stored) {
-        return res.status(401).json({ error: 'Token revoked' });
-      }
-
-      const newAccessToken = generateAccessToken(payload.sub);
-      res.json({ accessToken: newAccessToken });
-    } catch (err) {
-      console.error('Refresh error:', err);
-      res.status(500).json({ error: 'Refresh failed' });
-    }
-  },
   async logout(req, res) {
     try {
-      const { refreshToken } = req.body;
-      if (!refreshToken) {
-        return res.status(400).json({ error: 'Missing refresh token' });
-      }
-
-      await RefreshToken.deleteOne({ token: hashToken(refreshToken) });
+      const refreshToken = req.cookies?.refreshToken;
+      if (refreshToken) {
+        await RefreshToken.deleteOne({ token: hashToken(refreshToken) });
+      };
+      res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/',
+      });   
       res.json({ message: 'Logged out' });
     } catch (err) {
       console.error('Logout error:', err);
       res.status(500).json({ error: 'Logout failed' });
     }
   },
+
   async logoutAll(req, res) {
     try {
       await RefreshToken.deleteMany({ userId: req.userId });
+      res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/',
+      });
       res.json({ message: 'All sessions logged out' });
     } catch (err) {
       console.error('Logout all error:', err);

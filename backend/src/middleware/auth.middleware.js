@@ -19,15 +19,15 @@ export async function requireAuth(req, res, next) {
     return next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
-      const refreshHeader = req.headers['x-refresh-token'];
-      if (!refreshHeader) {
+      const refreshToken = req.cookies?.refreshToken;
+      if (!refreshToken) {
         return res.status(401).json({ error: 'Token expired, no refresh token provided' });
       }
 
       try {
-        const payload = verifyRefreshToken(refreshHeader);
+        const payload = verifyRefreshToken(refreshToken);
         const stored = await RefreshToken.findOne({
-          token:  hashToken(refreshHeader),
+          token:  hashToken(refreshToken),
           userId: payload.sub,
         });
 
