@@ -18,7 +18,7 @@ export function generateAccessToken(userId) {
 export function generateRefreshToken(userId) {
     return jwt.sign(
         {
-            userId: userId
+            sub: userId
         },
         REFRESH_SECRET,
         {

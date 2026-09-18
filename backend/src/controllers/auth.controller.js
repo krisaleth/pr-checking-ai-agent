@@ -36,7 +36,7 @@ export const authController = {
       const tokenRes = await axios.post(
         'https://github.com/login/oauth/access_token',
         {
-          client_id:     GITHUB_CLIENT_ID,
+          client_id: GITHUB_CLIENT_ID,
           client_secret: GITHUB_CLIENT_SECRET,
           code,
         },
