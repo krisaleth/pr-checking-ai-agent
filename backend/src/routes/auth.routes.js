@@ -1,23 +1,14 @@
 import { Router } from 'express';
-import { login, getProfile, refreshAccessToken, githubCallback } from '../controllers/auth.controller.js';
-import verifyAccessToken from '../middleware/auth.middleware.js';
+import { authController } from '../controllers/auth.controller.js';
+import { requireAuth } from '../middleware/auth.middleware.js';
 
-const authRouter = Router();
+const router = Router();   
 
-authRouter.post("/login", login);
+router.get('/github', authController.redirectToGithub);
+router.get('/github/callback', authController.githubCallback);
+router.post('/refresh', authController.refresh);
+router.post('/logout', authController.logout);
 
-authRouter.get("/github", (req, res) => {
-    const githubUrl =
-        `https://github.com/login/oauth/authorize` +
-        `?client_id=${process.env.GITHUB_CLIENT_ID}` +
-        `&redirect_uri=${process.env.GITHUB_CALLBACK_URL}` +
-        `&scope=user:email`;
+router.post('/logout-all', requireAuth, authController.logoutAll);
 
-    res.redirect(githubUrl);
-});
-
-authRouter.get("/github/callback", githubCallback);
-authRouter.post("/refresh-token", refreshAccessToken);
-authRouter.get("/profile", verifyAccessToken, getProfile);
-
-export default authRouter;
+export default router;
