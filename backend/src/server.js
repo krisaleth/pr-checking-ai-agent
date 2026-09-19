@@ -3,11 +3,13 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import routes from './routes/index.routes.js';
 import authRouter from './routes/auth.routes.js';
-import connectDB from './config/database.js';
+import { connectDatabase } from './config/database.js';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
+import githubWebhookRouter from './routes/github.webhook.routes.js';
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 
 const globalLimiter = rateLimit({
@@ -17,6 +19,12 @@ const globalLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many requests! Please try again later.' },
 });
+
+app.use(
+  '/api/github',
+  express.raw({ type: 'application/json' }),
+  githubWebhookRouter
+);
 
 app.use(express.json());
 app.use(session({
@@ -41,7 +49,7 @@ app.use((err, req, res, next) => {
 });
 
 try {
-  await connectDB();
+  await connectDatabase();
   app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 } catch (err) {
   console.error('Failed to start:', err.message);

@@ -30,6 +30,4 @@ const userSchema = new mongoose.Schema(
     }
 );
 
-userSchema.index({ githubId: 1 }, { unique: true});
-
 export default mongoose.model('User', userSchema);

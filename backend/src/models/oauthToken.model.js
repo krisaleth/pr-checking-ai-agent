@@ -22,7 +22,7 @@ const oauthTokenSchema = new mongoose.Schema({
         type: Date,
         required: true,
     }
-}, { timestamp: true });
+}, { timestamps: true });
 
 oauthTokenSchema.index({ expiresAt: 1}, {expireAfterSeconds: 0});
 
