@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { fetchPRDiffWithInstallation } from '../services/github.service.js';
+import { fetchPRDiffWithInstallation } from '../src/services/github.service.js';
 
 const owner = 'krisaleth';
 const repo = 'test-bot-repo';

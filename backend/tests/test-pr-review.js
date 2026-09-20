@@ -1,6 +1,6 @@
 import 'dotenv/config';
 
-import { reviewPullRequest } from '../services/pr-review.service.js';
+import { reviewPullRequest } from '../src/services/pr-review.service.js';
 
 
 const owner = 'krisaleth';

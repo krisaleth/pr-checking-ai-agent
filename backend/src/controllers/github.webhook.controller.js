@@ -164,7 +164,6 @@ export const githubWebhookController = {
                 });
 
             if (existingDelivery) {
-
                 console.log(
                     '[Webhook] Duplicate delivery:',
                     deliveryId
@@ -240,21 +239,14 @@ export const githubWebhookController = {
             /*
              * Store webhook delivery.
              */
-            await WebhookDelivery.create({
-
+            const webhookDelivery = await WebhookDelivery.create({
                 githubDeliveryId: deliveryId,
-
                 event,
-
                 action,
-
                 repositoryId:
                     repositoryDocument._id,
-
                 pullRequestNumber: prNumber,
-
                 headSha,
-
                 status: 'received',
             });
 
@@ -276,41 +268,93 @@ export const githubWebhookController = {
                 });
             }
 
-            const reviewDocument = await Review.findOneAndUpdate(
-                {
-                    pullRequestId: pullRequestDocument._id,
-                    headSha,
-                },
-                {
-                    pullRequestId: pullRequestDocument._id,
-                    headSha,
-                    status: 'queued',
-                },
-                {
-                    returnDocument: 'after',
-                    upsert: true,
-                    setDefaultsOnInsert: true,
+            let reviewDocument = await Review.findOne({
+                pullRequestId: pullRequestDocument._id,
+                headSha,
+            });
+
+            if (reviewDocument) {
+                console.log(
+                    `[Webhook] Review already exists: ${reviewDocument._id} ` +
+                    `(status: ${reviewDocument.status})`
+                );
+            } else {
+                try {
+                    reviewDocument = await Review.create({
+                        pullRequestId: pullRequestDocument._id,
+                        headSha,
+                        status: 'queued',
+                    });
+
+                    console.log(
+                        '[Webhook] Review queued:',
+                        reviewDocument._id
+                    );
+                } catch (error) {
+                    if (error?.code !== 11000) {
+                        throw error;
+                    }
+
+                    console.log(
+                        '[Webhook] Review was created concurrently. ' +
+                        'Loading existing review.'
+                    );
+
+                    reviewDocument = await Review.findOne({
+                        pullRequestId: pullRequestDocument._id,
+                        headSha,
+                    });
+
+                    if (!reviewDocument) {
+                        throw new Error(
+                            'Review creation raced with another request, ' +
+                            'but the existing review could not be found'
+                        );
+                    }
+
+                    console.log(
+                        `[Webhook] Existing review loaded: ${reviewDocument._id} ` +
+                        `(status: ${reviewDocument.status})`
+                    );
                 }
-            );
+            }
 
-            console.log(
-                '[Webhook] Review queued:',
-                reviewDocument._id
-            );
+            if (
+                reviewDocument.status === 'queued' ||
+                reviewDocument.status === 'failed'
+            ) {
+                if (reviewDocument.status === 'failed') {
+                    console.log(
+                        `[Webhook] Retrying failed review: ${reviewDocument._id}`
+                    );
 
-            processReview(reviewDocument._id.toString())
-                .catch((error) => {
+                    reviewDocument.status = 'queued';
+                    reviewDocument.errorMessage = null;
+                    reviewDocument.startedAt = null;
+                    reviewDocument.completedAt = null;
+
+                    await reviewDocument.save();
+                }
+
+                webhookDelivery.status = 'processing';
+                await webhookDelivery.save();
+
+                processReview(
+                    reviewDocument._id.toString(),
+                    webhookDelivery._id.toString()
+                ).catch((error) => {
                     console.error(
                         `[Webhook] Review ${reviewDocument._id} failed:`,
                         error.message
                     );
                 });
 
-            return res.status(200).json({
-                received: true,
-                review: true,
-                reviewId: reviewDocument._id,
-            });
+                return res.status(200).json({
+                    received: true,
+                    review: true,
+                    reviewId: reviewDocument._id,
+                });
+            }
         }
 
         console.log(

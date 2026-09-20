@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { getInstallationToken } from '../services/github-app.service.js';
+import { getInstallationToken } from '../src/services/github-app.service.js';
 
 const installationId = 162980399;
 

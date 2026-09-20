@@ -2,15 +2,15 @@ import 'dotenv/config';
 
 import {
     reviewPullRequest,
-} from '../services/pr-review.service.js';
+} from '../src/services/pr-review.service.js';
 
 import {
     fetchPullRequestWithInstallation,
-} from '../services/github.service.js';
+} from '../src/services/github.service.js';
 
 import {
     createPullRequestReview,
-} from '../services/github-review.service.js';
+} from '../src/services/github-review.service.js';
 
 
 const owner = 'krisaleth';

@@ -3,10 +3,11 @@ import PullRequest from '../models/pull-request.model.js';
 import Repository from '../models/repository.model.js';
 import ReviewFinding from '../models/review-finding.model.js';
 import { createPullRequestReview } from './github-review.service.js';
+import WebhookDelivery from '../models/webhook-delivery.model.js';
 
 import { reviewPullRequest } from './pr-review.service.js';
 
-export async function processReview(reviewId) {
+export async function processReview(reviewId, webhookDeliveryId) {
     if (!reviewId) {
         throw new Error('reviewId is required');
     }
@@ -168,6 +169,16 @@ export async function processReview(reviewId) {
 
         await review.save();
 
+        if (webhookDeliveryId) {
+            await WebhookDelivery.findByIdAndUpdate(
+                webhookDeliveryId,
+                {
+                    status: 'processed',
+                    processedAt: new Date(),
+                }
+            );
+        }
+
         console.log(
             `[Review Job] Review ${reviewId} completed`
         );
@@ -178,8 +189,18 @@ export async function processReview(reviewId) {
         review.status = 'failed';
         review.errorMessage = error.message;
         review.completedAt = new Date();
-
         await review.save();
+
+        if (webhookDeliveryId) {
+            await WebhookDelivery.findByIdAndUpdate(
+                webhookDeliveryId,
+                {
+                    status: 'failed',
+                    errorMessage: error.message,
+                    processedAt: new Date(),
+                }
+            );
+        }
 
         console.error(
             `[Review Job] Review ${reviewId} failed:`,

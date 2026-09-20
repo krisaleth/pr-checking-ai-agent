@@ -3,12 +3,12 @@ import 'dotenv/config';
 import {
     connectDatabase,
     disconnectDatabase,
-} from '../config/database.js';
+} from '../src/config/database.js';
 
-import Repository from '../models/repository.model.js';
-import PullRequest from '../models/pull-request.model.js';
-import Review from '../models/review.model.js';
-import ReviewFinding from '../models/review-finding.model.js';
+import Repository from '../src/models/repository.model.js';
+import PullRequest from '../src/models/pull-request.model.js';
+import Review from '../src/models/review.model.js';
+import ReviewFinding from '../src/models/review-finding.model.js';
 
 const TEST_REPO_ID = 999999999;
 

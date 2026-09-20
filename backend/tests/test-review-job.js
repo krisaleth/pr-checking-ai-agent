@@ -1,7 +1,7 @@
 import 'dotenv/config';
 
-import { connectDatabase, disconnectDatabase } from './config/database.js';
-import { processReview } from './services/review-job.service.js';
+import { connectDatabase, disconnectDatabase } from '../src/config/database.js';
+import { processReview } from '../src/services/review-job.service.js';
 
 const reviewId = '6aae958fe8132fdb42b69740';
 
