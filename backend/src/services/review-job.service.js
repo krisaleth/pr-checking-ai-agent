@@ -47,10 +47,28 @@ export async function processReview(reviewId, webhookDeliveryId) {
         );
     }
 
-    review.status = 'running';
-    review.startedAt = new Date();
+    const claimedReview = await Review.findOneAndUpdate(
+        {
+            _id: reviewId,
+            status: 'queued',
+        },
+        {
+            $set: {
+                status: 'running',
+                startedAt: new Date(),
+            },
+        },
+        {
+            returnDocument: 'after',
+        }
+    );
 
-    await review.save();
+    if (!claimedReview) {
+        console.log(
+            `[Review Job] Review ${reviewId} was already claimed`
+        );
+        return await Review.findById(reviewId);
+    }
 
     console.log(
         `[Review Job] Review ${reviewId} is now running`
@@ -81,13 +99,13 @@ export async function processReview(reviewId, webhookDeliveryId) {
         );
 
         await ReviewFinding.deleteMany({
-            reviewId: review._id,
+            reviewId: claimedReview._id,
         });
 
         if (allFindings.length > 0) {
             await ReviewFinding.insertMany(
                 allFindings.map((finding) => ({
-                    reviewId: review._id,
+                    reviewId: claimedReview._id,
                     file: finding.file,
                     line: finding.line ?? null,
                     side: finding.side ?? 'RIGHT',
@@ -103,7 +121,7 @@ export async function processReview(reviewId, webhookDeliveryId) {
                 }))
             );
             const mappedFindings = await ReviewFinding.find({
-                reviewId: review._id,
+                reviewId: claimedReview._id,
                 mapped: true,
                 postedToGithub: false,
             });
@@ -134,7 +152,7 @@ export async function processReview(reviewId, webhookDeliveryId) {
                 if (githubReview) {
                     await ReviewFinding.updateMany(
                         {
-                            reviewId: review._id,
+                            reviewId: claimedReview._id,
                             mapped: true,
                             postedToGithub: false,
                         },
@@ -145,29 +163,29 @@ export async function processReview(reviewId, webhookDeliveryId) {
                         }
                     );
 
-                    review.githubReviewId = githubReview.id;
+                    claimedReview.githubReviewId = githubReview.id;
                 }
             }
         }
 
-        review.model = 'dots-studio/dots-3-note-preview:free';
+        claimedReview.model = 'dots-studio/dots-3-note-preview:free';
 
-        review.summary = result.summary || '';
+        claimedReview.summary = result.summary || '';
 
-        review.rawAiResponse = result;
+        claimedReview.rawAiResponse = result;
 
-        review.findingsCount = (result.findings?.length || 0) + (result.unmapped_findings?.length || 0);
+        claimedReview.findingsCount = (result.findings?.length || 0) + (result.unmapped_findings?.length || 0);
 
-        review.mappedFindingsCount =
+        claimedReview.mappedFindingsCount =
             result.findings?.length || 0;
 
-        review.unmappedFindingsCount =
+        claimedReview.unmappedFindingsCount =
             result.unmapped_findings?.length || 0;
 
-        review.status = 'completed';
-        review.completedAt = new Date();
+        claimedReview.status = 'completed';
+        claimedReview.completedAt = new Date();
 
-        await review.save();
+        await claimedReview.save();
 
         if (webhookDeliveryId) {
             await WebhookDelivery.findByIdAndUpdate(
@@ -183,13 +201,13 @@ export async function processReview(reviewId, webhookDeliveryId) {
             `[Review Job] Review ${reviewId} completed`
         );
 
-        return review;
+        return claimedReview;
 
     } catch (error) {
-        review.status = 'failed';
-        review.errorMessage = error.message;
-        review.completedAt = new Date();
-        await review.save();
+        claimedReview.status = 'failed';
+        claimedReview.errorMessage = error.message;
+        claimedReview.completedAt = new Date();
+        await claimedReview.save();
 
         if (webhookDeliveryId) {
             await WebhookDelivery.findByIdAndUpdate(

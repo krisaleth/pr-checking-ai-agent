@@ -319,30 +319,55 @@ export const githubWebhookController = {
                 }
             }
 
-            if (
-                reviewDocument.status === 'queued' ||
-                reviewDocument.status === 'failed'
-            ) {
+            if (reviewDocument.status === 'queued' || reviewDocument.status === 'failed') {
                 if (reviewDocument.status === 'failed') {
                     console.log(
                         `[Webhook] Retrying failed review: ${reviewDocument._id}`
                     );
 
-                    reviewDocument.status = 'queued';
-                    reviewDocument.errorMessage = null;
-                    reviewDocument.startedAt = null;
-                    reviewDocument.completedAt = null;
+                    const resetReview = await Review.findOneAndUpdate(
+                        {
+                            _id: reviewDocument._id,
+                            status: 'failed',
+                        },
+                        {
+                            $set: {
+                                status: 'queued',
+                                errorMessage: null,
+                                startedAt: null,
+                                completedAt: null,
+                            },
+                        },
+                        {
+                            returnDocument: 'after',
+                        }
+                    );
 
-                    await reviewDocument.save();
+                    if (!resetReview) {
+                        console.log(
+                            `[Webhook] Review ${reviewDocument._id} ` +
+                            `was already reset by another request`
+                        );
+
+                        webhookDelivery.status = 'processed';
+                        webhookDelivery.processedAt = new Date();
+                        await webhookDelivery.save();
+
+                        return res.status(200).json({
+                            received: true,
+                            review: false,
+                            duplicateReview: true,
+                            reviewId: reviewDocument._id,
+                        });
+                    }
+
+                    reviewDocument = resetReview;
                 }
 
                 webhookDelivery.status = 'processing';
                 await webhookDelivery.save();
 
-                processReview(
-                    reviewDocument._id.toString(),
-                    webhookDelivery._id.toString()
-                ).catch((error) => {
+                processReview(reviewDocument._id.toString(), webhookDelivery._id.toString()).catch((error) => {
                     console.error(
                         `[Webhook] Review ${reviewDocument._id} failed:`,
                         error.message
@@ -357,10 +382,7 @@ export const githubWebhookController = {
             }
         }
 
-        console.log(
-            'Unhandled GitHub event:',
-            event
-        );
+        console.log(`[Webhook] Event ${event} received but no further processing was required`);
 
         return res.status(200).json({
             received: true,
