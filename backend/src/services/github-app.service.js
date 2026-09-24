@@ -29,3 +29,75 @@ export async function getInstallationToken(installationId) {
 
   return authentication.token;
 }
+
+export async function getUserInstallation(username) {
+    if (!username) {
+        throw new Error('username is required');
+    }
+
+    const authentication = await auth({
+        type: 'app',
+    });
+
+    const response = await fetch(
+        `https://api.github.com/users/${encodeURIComponent(username)}/installation`,
+        {
+            method: 'GET',
+            headers: {
+                Authorization: `Bearer ${authentication.token}`,
+                Accept: 'application/vnd.github+json',
+                'User-Agent': 'PR-Review-AI-Agent',
+                'X-GitHub-Api-Version': '2022-11-28',
+            },
+        }
+    );
+
+    if (!response.ok) {
+        if (response.status === 404) {
+            return null;
+        }
+
+        throw new Error(
+            `GitHub API request failed with status ${response.status}`
+        );
+    }
+
+    return await response.json();
+}
+
+export async function getInstallation(installationId) {
+    if (!installationId) {
+        throw new Error('installationId is required');
+    }
+
+    const authentication = await auth({
+        type: 'app',
+    });
+
+    const response = await fetch(
+        `https://api.github.com/app/installations/${encodeURIComponent(
+            installationId
+        )}`,
+        {
+            method: 'GET',
+            headers: {
+                Authorization: `Bearer ${authentication.token}`,
+                Accept: 'application/vnd.github+json',
+                'User-Agent': 'PR-Review-AI-Agent',
+                'X-GitHub-Api-Version': '2022-11-28',
+            },
+        }
+    );
+
+    if (response.status === 404) {
+        return null;
+    }
+
+    if (!response.ok) {
+        throw new Error(
+            `GitHub API request failed with status ${response.status}`
+        );
+    }
+
+    return await response.json();
+}
