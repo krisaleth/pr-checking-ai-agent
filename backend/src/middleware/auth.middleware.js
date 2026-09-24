@@ -1,35 +1,51 @@
-import jwt from "jsonwebtoken";
+import { verifyAccessToken, generateAccessToken, verifyRefreshToken } from '../utils/token.js';
+import { RefreshToken } from '../models/index.models.js';
+import crypto from 'crypto';
 
-// Kiểm tra Access Token
-export default function verifyAccessToken(req, res, next) {
-    try {
-        // Lấy token từ header Authorization
-        const authHeader = req.headers.authorization;
+function hashToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
 
-        if (!authHeader || !authHeader.startsWith("Bearer ")) {
-            return res.status(401).json({
-                success: false,
-                message: "Access Token is required"
-            });
+export async function requireAuth(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'No token provided' });
+  }
+
+  const token = header.split(' ')[1];
+  try {
+    const payload = verifyAccessToken(token);
+    req.userId = payload.sub;
+    return next();
+  } catch (err) {
+    if (err.name === 'TokenExpiredError') {
+      const refreshToken = req.cookies?.refreshToken;
+      if (!refreshToken) {
+        return res.status(401).json({ error: 'Token expired, no refresh token provided' });
+      }
+
+      try {
+        const payload = verifyRefreshToken(refreshToken);
+        const stored = await RefreshToken.findOne({
+          token:  hashToken(refreshToken),
+          userId: payload.sub,
+        });
+
+        if (!stored) {
+          return res.status(401).json({ error: 'Token revoked' });
         }
 
-        // Lấy phần token sau "Bearer "
-        const token = authHeader.split(" ")[1];
+        const newAccessToken = generateAccessToken(payload.sub);
+        req.userId = payload.sub;
 
-        // Kiểm tra token
-        const decoded = jwt.verify(
-            token,
-            process.env.JWT_ACCESS_SECRET
-        );
+        res.setHeader('X-Access-Token', newAccessToken);
 
-        // Lưu thông tin user vào request
-        req.user = decoded;
-
-        next();
-    } catch (error) {
-        return res.status(401).json({
-            success: false,
-            message: "Invalid or expired Access Token"
-        });
+        return next();
+      } catch {
+        return res.status(401).json({ error: 'Refresh token invalid' });
+      }
     }
-};
+
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+}   

@@ -1,165 +1,146 @@
-import jwt from "jsonwebtoken";
-import axios from "axios";
+import crypto from 'crypto';
+import axios from 'axios';
+import { User, OAuthToken, RefreshToken } from '../models/index.models.js';
+import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utils/token.js';
+import { decrypt, encrypt } from '../utils/encrypt.js';
 
-import {
-    generateAccessToken,
-    generateRefreshToken
-} from "../utils/token.js";
+const GITHUB_CLIENT_ID     = process.env.GITHUB_CLIENT_ID;
+const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
+const REDIRECT_URI         = process.env.REDIRECT_URI;
+const REFRESH_TOKEN_TTL    = 30 * 24 * 3600 * 1000;
 
-import {
-    saveRefreshToken,
-    getRefreshToken
-} from "../utils/refreshToken.store.js";
+function hashToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
 
-// Login và tạo 2 token
-export function login(req, res) {
-    // Tạm thời giả lập user
-    const user = {
-        userId: "U001"
-    };
+export const authController = {
+  redirectToGithub(req, res) {
+    const state = crypto.randomBytes(16).toString('hex');
+    req.session.oauthState = state;
 
-    const accessToken = generateAccessToken(user);
-    const refreshToken = generateRefreshToken(user);
+    const url = new URL('https://github.com/login/oauth/authorize');
+    url.searchParams.set('client_id', GITHUB_CLIENT_ID);
+    url.searchParams.set('redirect_uri', REDIRECT_URI);
+    url.searchParams.set('scope', 'repo read:user user:email');
+    url.searchParams.set('state', state);
 
-    // Lưu Refresh Token ở backend
-    saveRefreshToken(user.userId, refreshToken);
-
-    res.status(200).json({
-        success: true,
-        message: "Login successful",
-        accessToken,
-        refreshToken
-    });
-};
-
-// API test cần đăng nhập
-export function getProfile(req, res) {
-    res.status(200).json({
-        success: true,
-        message: "Access Token is valid",
-        user: req.user
-    });
-};
-
-// Tạo Access Token mới bằng Refresh Token
-export function refreshAccessToken(req, res) {
+    res.redirect(url.toString());
+  },
+  async githubCallback(req, res) {
     try {
-        const { refreshToken } = req.body;
+      const { code, state } = req.query;
 
-        if (!refreshToken) {
-            return res.status(401).json({
-                success: false,
-                message: "Refresh Token is required"
-            });
-        }
+      if (state !== req.session.oauthState) {
+        return res.status(403).json({ error: 'Invalid state' });
+      }
+      delete req.session.oauthState;
 
-        // Kiểm tra Refresh Token có hợp lệ không
-        const decoded = jwt.verify(
-            refreshToken,
-            process.env.JWT_REFRESH_SECRET
-        );
+      const tokenRes = await axios.post(
+        'https://github.com/login/oauth/access_token',
+        {
+          client_id: GITHUB_CLIENT_ID,
+          client_secret: GITHUB_CLIENT_SECRET,
+          code,
+        },
+        { headers: { Accept: 'application/json' } }
+      );
 
-        // Lấy Refresh Token đang được lưu ở backend
-        const savedToken = getRefreshToken(decoded.userId);
+      const { access_token: githubToken, scope } = tokenRes.data;
 
-        if (!savedToken || savedToken !== refreshToken) {
-            return res.status(401).json({
-                success: false,
-                message: "Invalid Refresh Token"
-            });
-        }
+      const userRes = await axios.get('https://api.github.com/user', {
+        headers: { Authorization: `Bearer ${githubToken}` },
+      });
+      const profile = userRes.data;
 
-        // Tạo Access Token mới
-        const newAccessToken = generateAccessToken({
-            userId: decoded.userId
+      let user = await User.findOne({ githubId: profile.id });
+      if (!user) {
+        user = await User.create({
+          githubId:  profile.id,
+          login:     profile.login,
+          name:      profile.name,
+          email:     profile.email,
+          avatarUrl: profile.avatar_url,
         });
+      } else {
+        user.lastLoginAt = new Date();
+        await user.save();
+      }
 
-        res.status(200).json({
-            success: true,
-            message: "Access Token refreshed",
-            accessToken: newAccessToken
-        });
+      await OAuthToken.updateOne(
+        { userId: user._id, provider: 'github' },
+        {
+          accessToken: encrypt(githubToken),
+          scopes: (scope || '').split(' ').filter(Boolean),
+        },
+        { upsert: true }
+      );
 
-    } catch (error) {
-        return res.status(401).json({
-            success: false,
-            message: "Invalid or expired Refresh Token"
+      const accessToken  = generateAccessToken(user._id);
+      let refreshToken;
+      const existing = await RefreshToken.findOne({
+        userId: user._id,
+        expiresAt: { $gt: new Date() }
+      });
+      if (existing) {
+        refreshToken = decrypt(existing.rawToken);
+      } else {
+        await RefreshToken.deleteMany({ userId: user._id });
+        refreshToken = generateRefreshToken(user._id);
+        await RefreshToken.create({
+          userId: user._id,
+          token: hashToken(refreshToken),
+          rawToken: encrypt(refreshToken),
+          expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL),
         });
+      }
+      
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: REFRESH_TOKEN_TTL,
+        path: '/'
+      });
+
+      res.json({ accessToken });
+    } catch (err) {
+      console.error('GitHub callback error:', err);
+      res.status(500).json({ error: 'Login failed' });
     }
-};
+  },
 
-// GitHub OAuth callback
-export async function githubCallback(req, res) {
+  async logout(req, res) {
     try {
-        const { code } = req.query;
-
-        if (!code) {
-            return res.status(400).json({
-                success: false,
-                message: "GitHub authorization code is required"
-            });
-        }
-
-        const tokenResponse = await axios.post(
-            "https://github.com/login/oauth/access_token",
-            {
-                client_id: process.env.GITHUB_CLIENT_ID,
-                client_secret: process.env.GITHUB_CLIENT_SECRET,
-                code: code
-            },
-            {
-                headers: {
-                    Accept: "application/json"
-                }
-            }
-        );
-
-        const githubAccessToken = tokenResponse.data.access_token;
-
-        // Lấy thông tin tài khoản GitHub
-        const userResponse = await axios.get(
-            "https://api.github.com/user",
-            {
-                headers: {
-                    Authorization: `Bearer ${githubAccessToken}`,
-                    Accept: "application/vnd.github+json"
-                }
-            }
-        );
-
-        const githubUser = userResponse.data;
-
-        // Tạm dùng GitHub ID làm userId
-        const user = {
-            userId: `github_${githubUser.id}`
-        };
-
-        // Tạo JWT của project
-        const accessToken = generateAccessToken(user);
-        const refreshToken = generateRefreshToken(user);
-
-        // Lưu Refresh Token ở backend
-        saveRefreshToken(user.userId, refreshToken);
-
-        res.status(200).json({
-            success: true,
-            message: "GitHub login successful",
-            githubUser: {
-                id: githubUser.id,
-                login: githubUser.login,
-                name: githubUser.name,
-                avatar: githubUser.avatar_url
-            },
-            accessToken,
-            refreshToken
-        });
-
-    } catch (error) {
-        console.error(error.response?.data || error.message);
-
-        return res.status(500).json({
-            success: false,
-            message: "GitHub login failed"
-        });
+      const refreshToken = req.cookies?.refreshToken;
+      if (refreshToken) {
+        await RefreshToken.deleteOne({ token: hashToken(refreshToken) });
+      };
+      res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/',
+      });   
+      res.json({ message: 'Logged out' });
+    } catch (err) {
+      console.error('Logout error:', err);
+      res.status(500).json({ error: 'Logout failed' });
     }
-};
+  },
+
+  async logoutAll(req, res) {
+    try {
+      await RefreshToken.deleteMany({ userId: req.userId });
+      res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/',
+      });
+      res.json({ message: 'All sessions logged out' });
+    } catch (err) {
+      console.error('Logout all error:', err);
+      res.status(500).json({ error: 'Logout failed' });
+    }
+  },
+};   

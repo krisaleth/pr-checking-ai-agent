@@ -1,27 +1,36 @@
 import jwt from "jsonwebtoken";
 
-// Tạo Access Token - dùng để gọi API
-export const generateAccessToken = (user) => {
+const ACCESS_SECRET = process.env.ACCESS_SECRET
+const REFRESH_SECRET = process.env.REFRESH_SECRET
+
+export function generateAccessToken(userId) {
     return jwt.sign(
         {
-            userId: user.userId
+            sub: userId
         },
-        process.env.JWT_ACCESS_SECRET,
+        ACCESS_SECRET,
         {
             expiresIn: "15m"
         }
     );
 };
 
-// Tạo Refresh Token - dùng để lấy Access Token mới
-export const generateRefreshToken = (user) => {
+export function generateRefreshToken(userId) {
     return jwt.sign(
         {
-            userId: user.userId
+            sub: userId
         },
-        process.env.JWT_REFRESH_SECRET,
+        REFRESH_SECRET,
         {
-            expiresIn: "7d"
+            expiresIn: "30d"
         }
     );
+};
+
+export function verifyAccessToken(token) {
+    return jwt.verify(token, ACCESS_SECRET)
+};
+
+export function verifyRefreshToken(token) {
+    return jwt.verify(token, REFRESH_SECRET)
 };
