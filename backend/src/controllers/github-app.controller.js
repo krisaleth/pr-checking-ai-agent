@@ -154,16 +154,18 @@ export const githubAppController = {
           }
         );
 
-      return res.status(200).json({
-        message: 'GitHub App installed successfully',
-        setupAction: setupAction || null,
-        installation: {
-          id: githubInstallation.installationId,
-          accountId: githubInstallation.accountId,
-          accountLogin: githubInstallation.accountLogin,
-          accountType: githubInstallation.accountType,
-        },
-      });
+      return res.status(200).send(`
+        <!doctype html>
+        <html>
+          <head>
+            <title>GitHub App Installed</title>
+          </head>
+          <body>
+            <h1>GitHub App installed successfully</h1>
+            <p>You can now use PR Check AI Agent on your repository.</p>
+          </body>
+        </html>
+      `);
     } catch (error) {
       console.error('[GitHub App] Setup failed:', error);
 
