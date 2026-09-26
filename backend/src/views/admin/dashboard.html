@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Admin Dashboard - PR Check AI Agent</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+
+            background: #f3f4f6;
+
+            color: #111827;
+
+            font-family:
+                system-ui,
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                sans-serif;
+        }
+
+        header {
+            background: #111827;
+            color: white;
+
+            padding: 20px 32px;
+
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 21px;
+        }
+
+        header span {
+            color: #9ca3af;
+            font-size: 13px;
+        }
+
+        .logout {
+            color: white;
+            text-decoration: none;
+
+            border: 1px solid #374151;
+
+            padding: 8px 12px;
+
+            border-radius: 7px;
+
+            font-size: 13px;
+        }
+
+        main {
+            max-width: 1400px;
+
+            margin: auto;
+
+            padding: 30px;
+        }
+
+        .cards {
+            display: grid;
+
+            grid-template-columns:
+                repeat(4, 1fr);
+
+            gap: 18px;
+
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: white;
+
+            padding: 22px;
+
+            border-radius: 12px;
+
+            box-shadow:
+                0 1px 3px
+                rgba(0, 0, 0, .08);
+        }
+
+        .label {
+            color: #6b7280;
+            font-size: 13px;
+        }
+
+        .value {
+            font-size: 32px;
+            font-weight: 700;
+
+            margin-top: 8px;
+        }
+
+        .panels {
+            display: grid;
+
+            grid-template-columns:
+                2fr 1fr;
+
+            gap: 20px;
+        }
+
+        .panel {
+            background: white;
+
+            padding: 22px;
+
+            border-radius: 12px;
+
+            box-shadow:
+                0 1px 3px
+                rgba(0, 0, 0, .08);
+
+            overflow: auto;
+        }
+
+        .panel h2 {
+            margin-top: 0;
+
+            font-size: 17px;
+        }
+
+        table {
+            width: 100%;
+
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            text-align: left;
+
+            padding: 11px 8px;
+
+            border-bottom:
+                1px solid #e5e7eb;
+
+            font-size: 13px;
+        }
+
+        th {
+            color: #6b7280;
+        }
+
+        .status {
+            display: inline-block;
+
+            padding: 4px 8px;
+
+            border-radius: 999px;
+
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .completed {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .running {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .queued {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .failed {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .refresh {
+            margin-bottom: 20px;
+
+            color: #6b7280;
+
+            font-size: 13px;
+        }
+
+        .health-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .health-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,.06);
+        }
+
+        .health-label {
+            color: #64748b;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .health-status {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .health-ok {
+            color: #16a34a;
+        }
+
+        .health-error {
+            color: #dc2626;
+        }
+
+        @media (max-width: 800px) {
+            .health-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media(max-width: 900px) {
+
+            .cards {
+                grid-template-columns:
+                    repeat(2, 1fr);
+            }
+
+            .panels {
+                grid-template-columns: 1fr;
+            }
+
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+<header>
+
+    <div>
+        <h1>PR Check AI Agent</h1>
+
+        <span>
+            Admin Dashboard
+        </span>
+    </div>
+
+    <form
+        method="POST"
+        action="/admin/logout"
+    >
+
+        <button
+            class="logout"
+            type="submit"
+        >
+            Logout
+        </button>
+
+    </form>
+
+</header>
+
+
+<main>
+
+    <div class="refresh">
+        Auto refresh every 15 seconds
+    </div>
+
+
+    <section class="cards">
+
+        <div class="card">
+
+            <div class="label">
+                Repositories
+            </div>
+
+            <div
+                id="repositories"
+                class="value"
+            >
+                -
+            </div>
+
+        </div>
+
+
+        <div class="card">
+
+            <div class="label">
+                Pull Requests
+            </div>
+
+            <div
+                id="pullRequests"
+                class="value"
+            >
+                -
+            </div>
+
+        </div>
+
+
+        <div class="card">
+
+            <div class="label">
+                AI Reviews
+            </div>
+
+            <div
+                id="reviews"
+                class="value"
+            >
+                -
+            </div>
+
+        </div>
+
+
+        <div class="card">
+
+            <div class="label">
+                Webhooks
+            </div>
+
+            <div
+                id="webhooks"
+                class="value"
+            >
+                -
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <section class="cards">
+
+        <div class="card">
+
+            <div class="label">
+                Completed
+            </div>
+
+            <div
+                id="completed"
+                class="value"
+            >
+                -
+            </div>
+
+        </div>
+
+
+        <div class="card">
+
+            <div class="label">
+                Running
+            </div>
+
+            <div
+                id="running"
+                class="value"
+            >
+                -
+            </div>
+
+        </div>
+
+
+        <div class="card">
+
+            <div class="label">
+                Queued
+            </div>
+
+            <div
+                id="queued"
+                class="value"
+            >
+                -
+            </div>
+
+        </div>
+
+
+        <div class="card">
+
+            <div class="label">
+                Failed
+            </div>
+
+            <div
+                id="failed"
+                class="value"
+            >
+                -
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <section class="panels">
+
+        <div class="panel">
+
+            <h2>System Health</h2>
+
+            <div class="health-grid">
+                <div class="health-card">
+                    <div class="health-label">Server</div>
+                    <div id="health-server" class="health-status">Checking...</div>
+                </div>
+
+                <div class="health-card">
+                    <div class="health-label">Database</div>
+                    <div id="health-database" class="health-status">Checking...</div>
+                </div>
+
+                <div class="health-card">
+                    <div class="health-label">AI</div>
+                    <div id="health-ai" class="health-status">Checking...</div>
+                </div>
+
+                <div class="health-card">
+                    <div class="health-label">GitHub</div>
+                    <div id="health-github" class="health-status">Checking...</div>
+                </div>
+            </div>
+
+            <h2>
+                Recent AI Reviews
+            </h2>
+
+            <table>
+
+                <thead>
+
+                    <tr>
+                        <th>Repository</th>
+                        <th>PR</th>
+                        <th>Status</th>
+                        <th>Model</th>
+                    </tr>
+
+                </thead>
+
+                <tbody id="reviewsTable">
+
+                    <tr>
+                        <td colspan="4">
+                            Loading...
+                        </td>
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+
+        <div class="panel">
+
+            <h2>
+                Recent Webhooks
+            </h2>
+
+            <table>
+
+                <thead>
+
+                    <tr>
+                        <th>Event</th>
+                        <th>Action</th>
+                        <th>Status</th>
+                    </tr>
+
+                </thead>
+
+                <tbody id="webhooksTable">
+
+                    <tr>
+                        <td colspan="3">
+                            Loading...
+                        </td>
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </section>
+
+</main>
+
+
+<script>
+
+async function loadDashboard() {
+
+    try {
+
+        const response =
+            await fetch('/admin/api/stats');
+
+        if (response.redirected) {
+            window.location.href = '/admin/login';
+            return;
+        }
+
+        const data =
+            await response.json();
+
+        if (!data.success) {
+            throw new Error('Dashboard API failed');
+        }
+
+        const s = data.stats;
+
+        document.getElementById('repositories').textContent =
+            s.repositories;
+
+        document.getElementById('pullRequests').textContent =
+            s.pullRequests;
+
+        document.getElementById('reviews').textContent =
+            s.reviews;
+
+        document.getElementById('webhooks').textContent =
+            s.webhooks;
+
+        document.getElementById('completed').textContent =
+            s.completed;
+
+        document.getElementById('running').textContent =
+            s.running;
+
+        document.getElementById('queued').textContent =
+            s.queued;
+
+        document.getElementById('failed').textContent =
+            s.failed;
+
+        renderReviews(data.recentReviews);
+        renderWebhooks(data.recentWebhooks);
+
+    } catch (error) {
+
+        console.error('[Admin Dashboard]', error);
+
+    }
+}
+
+
+function renderReviews(reviews) {
+
+    const table =
+        document.getElementById('reviewsTable');
+
+    if (!reviews || reviews.length === 0) {
+
+        table.innerHTML =
+            '<tr>' +
+            '<td colspan="4">No reviews yet</td>' +
+            '</tr>';
+
+        return;
+    }
+
+    table.innerHTML = reviews.map(review => {
+
+        const pr =
+            review.pullRequestId;
+
+        const repo =
+            pr?.repositoryId;
+
+        return (
+            '<tr>' +
+
+                '<td>' +
+                    (repo?.fullName || '-') +
+                '</td>' +
+
+                '<td>' +
+                    '#' +
+                    (pr?.githubPrNumber || '-') +
+                '</td>' +
+
+                '<td>' +
+                    '<span class="status ' +
+                    (review.status || '') +
+                    '">' +
+                    (review.status || '-') +
+                    '</span>' +
+                '</td>' +
+
+                '<td>' +
+                    (review.model || '-') +
+                '</td>' +
+
+            '</tr>'
+        );
+
+    }).join('');
+}
+
+
+function renderWebhooks(webhooks) {
+
+    const table =
+        document.getElementById('webhooksTable');
+
+    if (!webhooks || webhooks.length === 0) {
+
+        table.innerHTML =
+            '<tr>' +
+            '<td colspan="3">No webhooks yet</td>' +
+            '</tr>';
+
+        return;
+    }
+
+    table.innerHTML = webhooks.map(webhook => {
+
+        return (
+            '<tr>' +
+
+                '<td>' +
+                    (webhook.event || '-') +
+                '</td>' +
+
+                '<td>' +
+                    (webhook.action || '-') +
+                '</td>' +
+
+                '<td>' +
+                    (webhook.status || '-') +
+                '</td>' +
+
+            '</tr>'
+        );
+
+    }).join('');
+}
+
+async function loadHealth() {
+    try {
+        const response = await fetch('/admin/api/health');
+
+        const data = await response.json();
+
+        const health = data.health;
+
+        updateHealth('health-server', health.server.status);
+        updateHealth('health-database', health.database.status);
+        updateHealth('health-ai', health.ai.status);
+        updateHealth('health-github', health.github.status);
+
+    } catch (error) {
+        console.error('Health check failed:', error);
+
+        updateHealth('health-server', 'error');
+        updateHealth('health-database', 'error');
+        updateHealth('health-ai', 'error');
+        updateHealth('health-github', 'error');
+    }
+}
+
+function updateHealth(elementId, status) {
+    const element = document.getElementById(elementId);
+
+    if (!element) return;
+
+    element.textContent =
+        status === 'connected' ||
+        status === 'online' ||
+        status === 'configured'
+            ? '● ' + status
+            : '● ' + status;
+
+    element.className =
+        'health-status ' +
+        (
+            status === 'connected' ||
+            status === 'online' ||
+            status === 'configured'
+                ? 'health-ok'
+                : 'health-error'
+        );
+}
+
+
+loadDashboard();
+loadHealth();
+
+setInterval(
+    loadDashboard,
+    loadHealth,
+    15000
+);
+
+</script>
+
+</body>
+
+</html>

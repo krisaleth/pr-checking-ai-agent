@@ -7,6 +7,7 @@ import { connectDatabase } from './config/database.js';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
 import githubWebhookRouter from './routes/github.webhook.routes.js';
+import adminRouter from './routes/admin.routes.js';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -27,6 +28,7 @@ app.use(
 );
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
@@ -36,6 +38,7 @@ app.use(session({
 app.use(globalLimiter);
 
 app.use(cookieParser());
+app.use('/admin', adminRouter);
 app.use('/api/auth', authRouter);
 app.use('/api', routes);
 
