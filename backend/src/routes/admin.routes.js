@@ -6,51 +6,89 @@ import {
 
 const router = express.Router();
 
-function requireAdmin(req, res, next) {
-    if (!req.session.adminAuthenticated) {
-        return res.redirect('/admin/login');
+/**
+ * Check admin authentication for API endpoints.
+ */
+function requireAdminApi(req, res, next) {
+    if (!req.session?.adminAuthenticated) {
+        return res.status(401).json({
+            success: false,
+            message: 'Admin authentication required',
+        });
     }
 
     next();
 }
 
 /**
- * Public
+ * =========================
+ * Authentication
+ * =========================
  */
-router.get(
-    '/login',
-    adminController.showLogin
-);
 
+/**
+ * POST /admin/login
+ *
+ * Public.
+ *
+ * Used by React AdminLogin.
+ */
 router.post(
     '/login',
     adminController.login
 );
 
 /**
- * Protected
+ * POST /admin/logout
+ *
+ * Protected.
  */
 router.post(
     '/logout',
-    requireAdmin,
+    requireAdminApi,
     adminController.logout
 );
 
+/**
+ * GET /admin/api/session
+ *
+ * Check whether current session
+ * is authenticated as admin.
+ *
+ * This endpoint is public because
+ * unauthenticated users need to be
+ * able to check their session.
+ */
 router.get(
-    '/',
-    requireAdmin,
-    adminController.showDashboard
+    '/api/session',
+    adminController.session
 );
 
+/**
+ * =========================
+ * Admin APIs
+ * =========================
+ */
+
+/**
+ * GET /admin/api/health
+ *
+ * Protected.
+ */
 router.get(
     '/api/health',
-    requireAdmin,
+    requireAdminApi,
     adminController.health
 );
 
+/**
+ * GET /admin/api/stats
+ *
+ * Protected.
+ */
 router.get(
     '/api/stats',
-    requireAdmin,
+    requireAdminApi,
     adminController.dashboard
 );
 
