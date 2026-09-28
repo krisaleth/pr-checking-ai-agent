@@ -1,2 +1,8 @@
 - [x] Check AI from OpenRouter
-- [ ] Get Pull Request from Github
+- [x] Get Pull Request from Github
+- [x] OAuth Github
+- [x] JWT (Refresh Token, Access Token)
+- [ ] Database (MongoDB)
+- [ ] FrontEnd (Vite.js)
+- [ ] Learn how to optimize Openrouter AI
+- [ ] Write a report, document, README.md file too
