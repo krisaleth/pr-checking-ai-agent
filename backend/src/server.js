@@ -7,6 +7,8 @@ import { connectDatabase } from './config/database.js';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
 import githubWebhookRouter from './routes/github.webhook.routes.js';
+import adminRouter from './routes/admin.routes.js';
+import cors from 'cors';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -14,11 +16,18 @@ const PORT = process.env.PORT || 3000;
 
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 100,
+  limit: 10000,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   message: { error: 'Too many requests! Please try again later.' },
 });
+
+app.use(
+  cors({
+    origin: 'http://localhost:5173',
+    credentials: true,
+  })
+);
 
 app.use(
   '/api/github',
@@ -27,6 +36,7 @@ app.use(
 );
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
@@ -36,6 +46,7 @@ app.use(session({
 app.use(globalLimiter);
 
 app.use(cookieParser());
+app.use('/admin', adminRouter);
 app.use('/api/auth', authRouter);
 app.use('/api', routes);
 
