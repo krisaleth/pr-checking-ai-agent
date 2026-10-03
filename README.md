@@ -8,78 +8,270 @@
 [![GitHub App](https://img.shields.io/badge/GitHub-App-181717?logo=github\&logoColor=white)](https://github.com/)
 [![OpenRouter](https://img.shields.io/badge/AI-OpenRouter-7C3AED)](https://openrouter.ai/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-Database-47A248?logo=mongodb\&logoColor=white)](https://www.mongodb.com/)
-[![License](https://img.shields.io/badge/License-TBD-lightgrey)](#license)
 
-AI-powered GitHub Pull Request Code Review Agent.
+> **AI-powered GitHub Pull Request code review agent.**
 
-PR Checking AI Agent tự động phân tích Pull Request trên GitHub bằng Large Language Model (LLM), phát hiện các vấn đề tiềm ẩn trong code và trả về các finding có cấu trúc để hỗ trợ developer review code nhanh hơn.
+PR Checking AI Agent automatically analyzes GitHub Pull Requests using Large Language Models (LLMs) to identify potential issues and generate structured, actionable code review findings.
+
+The system integrates **GitHub App**, **GitHub Webhooks**, **GitHub REST API**, and **OpenRouter** to automate the code review workflow around Pull Requests.
+
+---
 
 ## ✨ Features
 
-* 🔐 GitHub OAuth authentication
 * 🤖 AI-powered Pull Request code review
 * 🐙 GitHub App integration
+* 🔔 GitHub Pull Request Webhooks
 * 🔑 GitHub Installation Token authentication
+* 🔐 GitHub OAuth authentication
 * 📄 Fetch Pull Request files and diffs
-* 🔍 Review added/modified code
-* 🧠 Structured AI findings
-* 💬 Post review results back to GitHub
-* 🛡️ Rate limiting
+* 🔍 Focus on added and modified code
+* 🧠 Structured AI review findings
+* 📍 Map findings to changed lines
+* 💬 Post review comments back to GitHub
+* 🛡️ API rate limiting
 * 🍪 Session-based authentication
-* 🔄 Refresh token support
+* 🔄 Access & refresh token support
 * 📊 Review status and results
-* 🔒 Webhook-based Pull Request processing
+* 🗄️ MongoDB persistence
+
+---
 
 ## 🏗️ Architecture
 
-```text
-                         ┌──────────────────────┐
-                         │       GitHub         │
-                         │                      │
-                         │ Pull Request / Push  │
-                         └──────────┬───────────┘
-                                    │
-                                    │ Webhook
-                                    ▼
-                         ┌──────────────────────┐
-                         │    Express Backend   │
-                         │                      │
-                         │  Webhook Controller  │
-                         └──────────┬───────────┘
-                                    │
-                                    ▼
-                         ┌──────────────────────┐
-                         │    GitHub Service    │
-                         │                      │
-                         │ Installation Token   │
-                         │ PR Files / Diff      │
-                         └──────────┬───────────┘
-                                    │
-                                    ▼
-                         ┌──────────────────────┐
-                         │   AI Review Service  │
-                         │                      │
-                         │      OpenRouter      │
-                         │        + LLM         │
-                         └──────────┬───────────┘
-                                    │
-                                    ▼
-                         ┌──────────────────────┐
-                         │  Review Validation   │
-                         │                      │
-                         │ Parse / Validate     │
-                         │ Map Findings         │
-                         └──────────┬───────────┘
-                                    │
-                                    ▼
-                         ┌──────────────────────┐
-                         │       GitHub         │
-                         │                      │
-                         │ PR Review / Comments │
-                         └──────────────────────┘
+```mermaid
+flowchart LR
+    GH["🐙 GitHub<br/>Pull Request"]
+
+    subgraph APP["PR Checking AI Agent"]
+        WEBHOOK["🔔 Webhook Controller"]
+        AUTH["🔐 Auth Service"]
+        GITHUB["⚙️ GitHub Service"]
+        REVIEW["🤖 AI Review Service"]
+        VALIDATE["✅ Review Validation"]
+        DB["🗄️ MongoDB"]
+    end
+
+    APPUI["🖥️ React Frontend"]
+    GHA["🐙 GitHub App"]
+    API["GitHub REST API"]
+    OR["🧠 OpenRouter<br/>LLM Gateway"]
+
+    GH -->|"Pull Request Webhook"| WEBHOOK
+    WEBHOOK --> GITHUB
+
+    GITHUB <-->|"JWT / Installation Token"| GHA
+    GITHUB <-->|"Files / Diff / PR data"| API
+
+    GITHUB -->|"Diff + Review Prompt"| REVIEW
+    REVIEW <-->|"LLM Request / Response"| OR
+
+    REVIEW --> VALIDATE
+    VALIDATE -->|"Validated Findings"| GITHUB
+    GITHUB -->|"Review / Comments"| GH
+
+    AUTH <--> DB
+    VALIDATE --> DB
+    GITHUB --> DB
+
+    APPUI <-->|"REST API"| AUTH
+    APPUI <-->|"Review Status / Results"| DB
 ```
 
-## 📁 Project Structure
+---
+
+## 🔄 How It Works
+
+### 1. Create or update a Pull Request
+
+A developer opens, reopens, or updates a Pull Request on GitHub.
+
+Supported events can include:
+
+```text
+pull_request.opened
+pull_request.synchronize
+pull_request.reopened
+```
+
+---
+
+### 2. GitHub sends a Webhook
+
+GitHub sends the Pull Request event to the backend.
+
+The webhook contains information such as:
+
+* Repository owner
+* Repository name
+* Pull Request number
+* Installation ID
+* Head commit SHA
+* Pull Request action
+
+```text
+GitHub
+   │
+   │ Pull Request Event
+   ▼
+Webhook Controller
+```
+
+---
+
+### 3. Authenticate as GitHub App
+
+The backend uses the GitHub App private key to generate a JWT.
+
+```text
+GitHub App Private Key
+          │
+          ▼
+         JWT
+          │
+          ▼
+Installation ID
+          │
+          ▼
+Installation Access Token
+```
+
+The Installation Token provides the permissions required to access the repository and Pull Request.
+
+---
+
+### 4. Fetch Pull Request changes
+
+The GitHub service retrieves the Pull Request files and diff.
+
+The review primarily focuses on:
+
+* Added lines
+* Modified lines
+* File paths
+* Relevant diff context
+* Pull Request metadata
+
+---
+
+### 5. Send the diff to the AI
+
+The diff is sent to the AI Review Service.
+
+The application uses **OpenRouter** as the LLM gateway.
+
+The reviewer is instructed to analyze areas such as:
+
+* Correctness
+* Security
+* Reliability
+* Maintainability
+* Performance
+* Testing
+* API contracts
+* Schema compatibility
+
+The model should only report issues supported by the available code and context.
+
+---
+
+### 6. Validate AI output
+
+The AI response is converted into a structured review format.
+
+Example:
+
+```json
+{
+  "summary": "The PR contains several issues that should be addressed.",
+  "findings": [
+    {
+      "file": "src/server.js",
+      "line": 42,
+      "side": "RIGHT",
+      "severity": "medium",
+      "confidence": 0.95,
+      "title": "Hardcoded server port",
+      "explanation": "The server uses a hardcoded port instead of the configured environment variable.",
+      "suggested_fix": "Use process.env.PORT with a fallback value.",
+      "needs_full_file": false
+    }
+  ]
+}
+```
+
+---
+
+### 7. Map findings to the diff
+
+AI-generated findings are mapped against the actual Pull Request diff.
+
+Only findings that can be reliably associated with changed code should be used as inline comments.
+
+This helps prevent:
+
+* Invalid GitHub review comments
+* Incorrect line references
+* Speculative findings
+* Comments on unrelated code
+
+---
+
+### 8. Publish the review
+
+Validated findings are sent back to GitHub.
+
+The review can contain:
+
+* Summary
+* Inline comments
+* Severity
+* Confidence
+* Explanation
+* Suggested fixes
+
+```text
+AI Review
+    │
+    ▼
+Validation
+    │
+    ▼
+Finding Mapping
+    │
+    ▼
+GitHub Pull Request
+```
+
+---
+
+# 🧩 Tech Stack
+
+## Backend
+
+| Technology            | Purpose                    |
+| --------------------- | -------------------------- |
+| Node.js               | Runtime                    |
+| Express.js            | REST API                   |
+| MongoDB               | Persistent storage         |
+| Mongoose              | MongoDB ODM                |
+| GitHub REST API       | Repository & PR operations |
+| GitHub App            | Repository authentication  |
+| GitHub OAuth          | User authentication        |
+| OpenRouter            | LLM gateway                |
+| OpenAI-compatible SDK | AI API client              |
+
+## Frontend
+
+| Technology | Purpose          |
+| ---------- | ---------------- |
+| React      | User interface   |
+| TypeScript | Type safety      |
+| Vite       | Frontend tooling |
+
+---
+
+# 📁 Project Structure
 
 ```text
 pr-checking-ai-agent/
@@ -110,177 +302,9 @@ pr-checking-ai-agent/
 └── README.md
 ```
 
-## 🔄 How It Works
+---
 
-### 1. User authenticates with GitHub
-
-The application uses GitHub OAuth to authenticate the user.
-
-```text
-User
- │
- ▼
-GitHub OAuth
- │
- ▼
-OAuth Callback
- │
- ▼
-Backend
- │
- ├── Access Token
- ├── Refresh Token
- └── User Session
-```
-
-### 2. GitHub App receives Pull Request events
-
-The GitHub App listens for Pull Request webhook events.
-
-For example:
-
-```text
-pull_request.opened
-pull_request.synchronize
-pull_request.reopened
-```
-
-The webhook contains information such as:
-
-* Repository
-* Pull Request number
-* Repository owner
-* Head commit SHA
-* Installation ID
-
-### 3. Backend authenticates as GitHub App
-
-The backend uses the GitHub App private key to authenticate and obtain an Installation Access Token.
-
-```text
-GitHub App Private Key
-        │
-        ▼
-JWT
-        │
-        ▼
-Installation ID
-        │
-        ▼
-Installation Access Token
-```
-
-### 4. Fetch Pull Request changes
-
-The GitHub service retrieves the files changed by the Pull Request.
-
-The review focuses primarily on:
-
-* Added lines
-* Modified lines
-* Relevant surrounding context
-* File path
-* Pull Request metadata
-
-### 5. Send changes to the LLM
-
-The diff is passed to the AI review service through OpenRouter.
-
-The model is instructed to behave as a senior code reviewer and focus on actionable issues.
-
-The review considers areas such as:
-
-* Correctness
-* Security
-* Reliability
-* Maintainability
-* Performance
-* Testing
-* API contracts
-* Schema compatibility
-
-The AI should not invent problems that cannot be supported by the provided code.
-
-### 6. Validate AI output
-
-The AI response is converted into a structured format.
-
-Example:
-
-```json
-{
-  "summary": "The PR contains several issues that should be addressed.",
-  "findings": [
-    {
-      "file": "src/server.js",
-      "line": 42,
-      "side": "RIGHT",
-      "severity": "medium",
-      "confidence": 0.95,
-      "title": "Hardcoded server port",
-      "explanation": "The server uses a hardcoded port instead of the configured environment variable.",
-      "suggested_fix": "Use process.env.PORT with a fallback value.",
-      "needs_full_file": false
-    }
-  ]
-}
-```
-
-### 7. Map findings to changed lines
-
-AI-generated findings must be mapped back to the actual Pull Request diff.
-
-Only findings that can be reliably associated with changed code should be posted as inline comments.
-
-Unmappable findings can be retained as general review information instead of creating an invalid inline comment.
-
-### 8. Publish the review
-
-Validated findings are sent back to GitHub.
-
-The final result may contain:
-
-* Review summary
-* Inline comments
-* Severity
-* Suggested fixes
-* General warnings
-
-## 🛠️ Tech Stack
-
-### Backend
-
-* Node.js
-* Express.js
-* MongoDB
-* Mongoose
-* GitHub REST API
-* GitHub App
-* GitHub OAuth
-* OpenRouter
-* OpenAI-compatible SDK
-
-### Frontend
-
-* React
-* TypeScript
-* Vite
-
-### Authentication
-
-* GitHub OAuth
-* Session authentication
-* Access tokens
-* Refresh tokens
-* GitHub App Installation Tokens
-
-### AI
-
-The application uses OpenRouter as the LLM gateway.
-
-The backend communicates with OpenRouter through an OpenAI-compatible API.
-
-## ⚙️ Requirements
+# ⚙️ Requirements
 
 Before running the project locally, install:
 
@@ -288,13 +312,16 @@ Before running the project locally, install:
 * npm
 * MongoDB
 * Git
-* A GitHub account
-* A GitHub App
-* An OpenRouter API key
+* GitHub account
+* GitHub OAuth App
+* GitHub App
+* OpenRouter API key
 
-## 🚀 Installation
+---
 
-### 1. Clone the repository
+# 🚀 Installation
+
+## 1. Clone the repository
 
 ```bash
 git clone https://github.com/krisaleth/pr-checking-ai-agent.git
@@ -302,21 +329,25 @@ git clone https://github.com/krisaleth/pr-checking-ai-agent.git
 cd pr-checking-ai-agent
 ```
 
-### 2. Install backend dependencies
+## 2. Install backend dependencies
 
 ```bash
 cd backend
+
 npm install
 ```
 
-### 3. Install frontend dependencies
+## 3. Install frontend dependencies
 
 ```bash
 cd ../frontend
+
 npm install
 ```
 
-## 🔐 Environment Variables
+---
+
+# 🔐 Environment Variables
 
 Create:
 
@@ -348,12 +379,13 @@ REDIRECT_URI=http://localhost:3000/api/auth/github/callback
 OPENAI_ADMIN_KEY=your_openrouter_api_key
 ```
 
-> Never commit `.env`, GitHub App private keys, or API keys to Git.
+> **Never commit `.env`, GitHub App private keys, OAuth secrets, or API keys to Git.**
 
 Recommended `.gitignore`:
 
 ```gitignore
 node_modules/
+
 .env
 .env.*
 !.env.example
@@ -365,17 +397,15 @@ build/
 logs/
 ```
 
-## 🐙 GitHub OAuth Setup
+---
 
-Create a GitHub OAuth App from your GitHub developer settings.
+# 🐙 GitHub OAuth Setup
 
-Configure the callback URL:
+Create a GitHub OAuth App and configure the callback URL:
 
 ```text
 http://localhost:3000/api/auth/github/callback
 ```
-
-The application uses OAuth for user authentication.
 
 Typical OAuth scopes:
 
@@ -385,13 +415,15 @@ read:user
 user:email
 ```
 
-For production, use HTTPS and a production callback URL.
+For production, use an HTTPS callback URL.
 
-## 🤖 GitHub App Setup
+---
+
+# 🤖 GitHub App Setup
 
 Create a GitHub App and configure the required repository permissions.
 
-The application requires Pull Request access in order to:
+The application requires Pull Request access to:
 
 * Read Pull Requests
 * Read changed files
@@ -400,50 +432,57 @@ The application requires Pull Request access in order to:
 
 Enable the required Pull Request webhook events.
 
-Example:
-
-```text
-Pull request
-```
-
 The GitHub App private key should be stored locally:
 
 ```text
 backend/keys/
 ```
 
-Do not commit the private key to Git.
+Example:
 
-## 🌐 Webhook Development
+```text
+backend/keys/pr-check-ai-agent.private-key.pem
+```
 
-For local development, GitHub cannot directly access:
+> Never commit the private key to Git.
+
+---
+
+# 🌐 Local Webhook Development
+
+GitHub cannot directly access:
 
 ```text
 localhost
 ```
 
-Use a secure tunnel such as Cloudflare Tunnel.
+during local development.
 
-Example:
+A secure tunnel can be used to expose the local server.
+
+For example, with Cloudflare Tunnel:
 
 ```bash
 cloudflared tunnel --url http://localhost:3000
 ```
 
-Configure the resulting HTTPS URL as the GitHub App webhook URL.
-
-Example:
+Configure the resulting HTTPS endpoint as the GitHub App webhook URL:
 
 ```text
 https://your-tunnel.example.com/api/github/webhook
 ```
 
-## ▶️ Running the Backend
+---
+
+# ▶️ Running the Project
+
+## Backend
 
 Development:
 
 ```bash
 cd backend
+
 npm run dev
 ```
 
@@ -453,92 +492,123 @@ Production:
 npm start
 ```
 
-The backend runs on:
+Default backend URL:
 
 ```text
 http://localhost:3000
 ```
 
-unless another `PORT` is configured.
+---
 
-## ▶️ Running the Frontend
+## Frontend
 
 ```bash
 cd frontend
+
 npm run dev
 ```
 
-The Vite development server will provide the frontend URL in the terminal.
+The Vite development server will display the frontend URL in the terminal.
 
-## 🧪 Testing
+---
 
-Run backend tests with:
+# 🧪 Testing
+
+Run backend tests:
 
 ```bash
 npm test
 ```
 
-If a dedicated integration test script is configured:
+Integration test:
 
 ```bash
 npm run test-github-review
 ```
 
-A GitHub Pull Request can be used to test the complete pipeline:
+A complete GitHub review flow looks like:
 
 ```text
-GitHub PR
-   ↓
-Webhook
-   ↓
-Backend
-   ↓
-GitHub Installation Token
-   ↓
-Fetch PR Diff
-   ↓
-AI Review
-   ↓
-Validate Findings
-   ↓
-Map Findings
-   ↓
-GitHub Review
+┌─────────────────┐
+│  GitHub PR      │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Webhook         │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ GitHub App Auth │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Fetch PR Diff   │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ AI Review       │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Validate        │
+│ Findings        │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Map Findings    │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ GitHub Review   │
+└─────────────────┘
 ```
 
-## 🔍 AI Review Principles
+---
 
-The AI reviewer should follow these principles:
+# 🔍 AI Review Principles
 
-### Focus on actionable issues
+The AI reviewer follows several principles.
 
-A finding should represent a problem that a developer can reasonably fix.
+### Actionable findings
+
+A finding should represent a problem that can reasonably be fixed.
 
 Avoid:
 
-* Style preferences without impact
+* Pure style preferences
 * Personal coding preferences
 * Speculative problems
 * Duplicate findings
-* Issues unrelated to the Pull Request
+* Unrelated issues
 
-### Do not invent context
+### Evidence-based analysis
 
-The model should only make claims supported by the available code and metadata.
+The model should only make claims supported by the provided code and context.
 
-If additional context is required, the finding should indicate that instead of assuming how the rest of the application works.
+It should not invent:
 
-### Prioritize changed code
+* APIs
+* Functions
+* Variables
+* Application behavior
+* External system behavior
+
+### Changed-code focus
 
 The primary review target is code introduced or modified by the Pull Request.
 
-Unchanged code should generally only be discussed when it is directly necessary to explain a problem caused by the changes.
+Unchanged code should only be discussed when it is directly relevant to a problem caused by the changes.
 
 ### Security
 
-Potential security issues should be treated carefully.
-
-Examples include:
+Potential security issues may include:
 
 * Authentication bypass
 * Authorization issues
@@ -549,7 +619,7 @@ Examples include:
 
 ### Reliability
 
-Review for issues that can cause:
+The reviewer should look for issues that may cause:
 
 * Runtime failures
 * Incorrect state
@@ -557,9 +627,11 @@ Review for issues that can cause:
 * Data loss
 * Unexpected API behavior
 
-## 📋 Finding Schema
+---
 
-A finding follows this general structure:
+# 📋 Finding Schema
+
+Each finding follows this general structure:
 
 ```json
 {
@@ -576,8 +648,6 @@ A finding follows this general structure:
 ```
 
 ### Severity
-
-Supported severity levels:
 
 ```text
 critical
@@ -596,11 +666,13 @@ Example:
 0.95
 ```
 
-means the model has high confidence.
+represents high confidence.
 
-## 🛡️ Security
+---
 
-Security-sensitive configuration must never be committed to the repository.
+# 🛡️ Security
+
+Never commit sensitive information.
 
 Do not commit:
 
@@ -615,34 +687,47 @@ Session secrets
 Database credentials
 ```
 
-Use environment variables or a dedicated secret-management solution in production.
+For production, use environment variables or a dedicated secret-management solution.
 
-## 📈 Production Considerations
+Additional security measures should include:
+
+* Webhook signature verification
+* Secure cookies
+* Strong session secrets
+* Request validation
+* API rate limiting
+* Token expiration
+* GitHub permission minimization
+
+---
+
+# 📈 Production Considerations
 
 Before deploying to production, consider implementing:
 
-* HTTPS
-* Secure cookies
-* Webhook signature verification
-* Strong session secrets
-* Database indexes
-* Request validation
-* API rate limiting
-* AI request timeouts
-* Retry handling
-* Review queue
-* Duplicate review prevention
-* Logging
-* Monitoring
-* Error tracking
-* Token/cost limits
-* Diff size limits
-* AI output validation
-* GitHub API retry handling
+* [ ] HTTPS
+* [ ] Secure cookies
+* [ ] Webhook signature verification
+* [ ] Database indexes
+* [ ] Request validation
+* [ ] API rate limiting
+* [ ] AI request timeout
+* [ ] Retry handling
+* [ ] Review queue
+* [ ] Duplicate review prevention
+* [ ] Logging
+* [ ] Monitoring
+* [ ] Error tracking
+* [ ] Token/cost limits
+* [ ] Diff size limits
+* [ ] AI output validation
+* [ ] GitHub API retry handling
 
-## 🗺️ Roadmap
+---
 
-### GitHub Integration
+# 🗺️ Roadmap
+
+## GitHub Integration
 
 * [x] GitHub OAuth
 * [x] GitHub App authentication
@@ -653,7 +738,7 @@ Before deploying to production, consider implementing:
 * [ ] Duplicate review prevention
 * [ ] Incremental review
 
-### AI Review
+## AI Review
 
 * [x] OpenRouter integration
 * [x] Structured review output
@@ -663,7 +748,7 @@ Before deploying to production, consider implementing:
 * [ ] Large PR handling
 * [ ] Review cost optimization
 
-### Backend
+## Backend
 
 * [x] Express API
 * [x] Session authentication
@@ -673,7 +758,7 @@ Before deploying to production, consider implementing:
 * [ ] Monitoring
 * [ ] Automated tests
 
-### Frontend
+## Frontend
 
 * [ ] Authentication UI
 * [ ] Repository selection
@@ -683,7 +768,7 @@ Before deploying to production, consider implementing:
 * [ ] Finding details
 * [ ] Dashboard
 
-### DevOps
+## DevOps
 
 * [ ] Production deployment
 * [ ] GitHub Actions CI
@@ -692,38 +777,73 @@ Before deploying to production, consider implementing:
 * [ ] Production logging
 * [ ] Monitoring
 
-## 🤝 Contributing
+---
+
+# 🤝 Contributing
 
 Contributions are welcome.
 
-Suggested workflow:
+Create a feature branch:
 
 ```bash
 git checkout -b feature/my-feature
+```
 
-# Make changes
+Make your changes and commit:
 
+```bash
 git add .
 
 git commit -m "feat: add my feature"
+```
 
+Push the branch:
+
+```bash
 git push origin feature/my-feature
 ```
 
-Then create a Pull Request on GitHub.
+Then create a Pull Request.
 
-## 📄 License
+---
+
+# 📄 License
 
 This project is currently under development.
 
-Add an appropriate license before distributing the project publicly.
+A suitable open-source license should be added before public distribution.
 
-## 👨‍💻 Project
+---
+
+# 👨‍💻 Project
 
 **PR Checking AI Agent**
+
+AI-powered GitHub Pull Request review system designed to help developers identify potential issues before merging code.
 
 Repository:
 
 https://github.com/krisaleth/pr-checking-ai-agent
 
-An AI-powered GitHub Pull Request review system designed to help developers identify potential issues before merging code.
+### Topics
+
+```text
+ai
+ai-code-review
+code-review
+github
+github-app
+github-api
+github-actions
+pull-request
+pull-request-review
+llm
+openrouter
+nodejs
+express
+react
+typescript
+mongodb
+developer-tools
+automation
+```
